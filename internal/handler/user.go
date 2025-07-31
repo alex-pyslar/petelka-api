@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/alex-pyslar/online-store/internal/models"
-	"github.com/alex-pyslar/online-store/internal/service"
 	"github.com/gorilla/mux"
 )
 
