@@ -9,6 +9,8 @@ RUN go mod download
 # Копируем остальной исходный код
 COPY . .
 
+COPY .env ./.env
+
 # Устанавливаем swag
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 
@@ -31,6 +33,9 @@ COPY --from=builder /app/ecommerce .
 
 # Копируем сгенерированные файлы Swagger UI (HTML, JS, CSS)
 COPY --from=builder /app/docs ./docs
+
+# Если .env нужен при запуске, он должен быть скопирован в финальный образ
+COPY --from=builder /app/.env ./.env
 
 EXPOSE 8080
 
