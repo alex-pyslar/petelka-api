@@ -120,6 +120,41 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(products)
 }
 
+// ListProductsByCategory godoc
+// @Summary List products by category ID
+// @Description Retrieve a list of products belonging to a specific category
+// @Tags products
+// @Produce json
+// @Param category_id path int true "Category ID"
+// @Success 200 {array} models.Product "List of products"
+// @Failure 400 {string} string "Invalid category ID"
+// @Failure 500 {string} string "Internal server error"
+// @Security ApiKeyAuth
+// @Router /products/category/{category_id} [get]
+func (h *ProductHandler) ListProductsByCategory(w http.ResponseWriter, r *http.Request) {
+	requestID := uuid.New().String()
+	ctx := context.WithValue(r.Context(), "request_id", requestID)
+
+	vars := mux.Vars(r)
+	categoryID, err := getIDFromVars(vars, "category_id", h.log, requestID)
+	if err != nil {
+		h.log.Errorf("Invalid category ID in request, request_id: %s: %v", requestID, err)
+		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	h.log.Infof("Fetching products for category ID: %d, request_id: %s", categoryID, requestID)
+	products, err := h.service.ListProductsByCategory(ctx, categoryID)
+	if err != nil {
+		h.log.Errorf("Failed to fetch products for category ID %d, request_id: %s: %v", categoryID, requestID, err)
+		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		return
+	}
+
+	h.log.Infof("Fetched %d products for category ID: %d, request_id: %s", len(products), categoryID, requestID)
+	json.NewEncoder(w).Encode(products)
+}
+
 // UpdateProduct godoc
 // @Summary Update an existing product
 // @Description Update product details by ID
