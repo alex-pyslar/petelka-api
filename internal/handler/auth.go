@@ -144,6 +144,10 @@ func (h *AuthHandler) JWTMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), "request_id", requestID)
 		r = r.WithContext(ctx)
 
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			h.log.Errorf("Authorization header is required, request_id: %s", requestID)
