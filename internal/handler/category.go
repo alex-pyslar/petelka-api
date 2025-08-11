@@ -1,26 +1,25 @@
 package handler
 
 import (
-	"context"
+	"database/sql"
 	"encoding/json"
-	"net/http"
-
-	"github.com/alex-pyslar/online-store/internal/logger"
 	"github.com/alex-pyslar/online-store/internal/models"
+	"net/http"
+	"strconv"
+
 	"github.com/alex-pyslar/online-store/internal/service"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // CategoryHandler handles requests to categories.
 type CategoryHandler struct {
 	service *service.CategoryService
-	log     *logger.Logger
 }
 
 // NewCategoryHandler creates a new CategoryHandler instance.
-func NewCategoryHandler(s *service.CategoryService, log *logger.Logger) *CategoryHandler {
-	return &CategoryHandler{service: s, log: log}
+func NewCategoryHandler(s *service.CategoryService) *CategoryHandler {
+	return &CategoryHandler{service: s}
 }
 
 // CreateCategory godoc
@@ -36,25 +35,17 @@ func NewCategoryHandler(s *service.CategoryService, log *logger.Logger) *Categor
 // @Security ApiKeyAuth
 // @Router /categories [post]
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Create category attempt from IP: %s, request_id: %s", r.RemoteAddr, requestID)
-
 	var category models.Category
 	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
-		h.log.Errorf("Error decoding create category request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.service.CreateCategory(ctx, &category); err != nil {
-		h.log.Errorf("Failed to create category, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to create category", http.StatusInternalServerError)
+	if err := h.service.CreateCategory(r.Context(), &category); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Category created with ID: %d, request_id: %s", category.ID, requestID)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(category)
 }
@@ -72,26 +63,28 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 // @Security ApiKeyAuth
 // @Router /categories/{id} [get]
 func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid category ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Fetching category with ID: %d, request_id: %s", id, requestID)
-	category, err := h.service.GetCategory(ctx, id)
+	category, err := h.service.GetCategory(r.Context(), id)
 	if err != nil {
-		h.log.Errorf("Failed to fetch category with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Category not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Category not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Category fetched with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(category)
 }
 
@@ -105,18 +98,12 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /categories [get]
 func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Fetching all categories, request_id: %s", requestID)
-	categories, err := h.service.ListCategories(ctx)
+	categories, err := h.service.ListCategories(r.Context())
 	if err != nil {
-		h.log.Errorf("Failed to fetch categories, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to fetch categories", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Fetched %d categories, request_id: %s", len(categories), requestID)
 	json.NewEncoder(w).Encode(categories)
 }
 
@@ -135,33 +122,34 @@ func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request)
 // @Security ApiKeyAuth
 // @Router /categories/{id} [put]
 func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid category ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Updating category with ID: %d, request_id: %s", id, requestID)
 	var category models.Category
 	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
-		h.log.Errorf("Error decoding update category request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	category.ID = id
 
-	if err := h.service.UpdateCategory(ctx, &category); err != nil {
-		h.log.Errorf("Failed to update category with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to update category", http.StatusInternalServerError)
+	if err := h.service.UpdateCategory(r.Context(), &category); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Category not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Category updated with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(category)
 }
 
@@ -177,24 +165,26 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 // @Security ApiKeyAuth
 // @Router /categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid category ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Deleting category with ID: %d, request_id: %s", id, requestID)
-	if err := h.service.DeleteCategory(ctx, id); err != nil {
-		h.log.Errorf("Failed to delete category with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to delete category", http.StatusInternalServerError)
+	if err := h.service.DeleteCategory(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Category not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Category deleted with ID: %d, request_id: %s", id, requestID)
 	w.WriteHeader(http.StatusNoContent)
 }

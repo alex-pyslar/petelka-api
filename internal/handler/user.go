@@ -1,26 +1,25 @@
 package handler
 
 import (
-	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
-	"github.com/alex-pyslar/online-store/internal/logger"
 	"github.com/alex-pyslar/online-store/internal/models"
 	"github.com/alex-pyslar/online-store/internal/service"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // UserHandler handles requests to users.
 type UserHandler struct {
 	service *service.UserService
-	log     *logger.Logger
 }
 
 // NewUserHandler creates a new UserHandler instance.
-func NewUserHandler(s *service.UserService, log *logger.Logger) *UserHandler {
-	return &UserHandler{service: s, log: log}
+func NewUserHandler(s *service.UserService) *UserHandler {
+	return &UserHandler{service: s}
 }
 
 // CreateUser godoc
@@ -36,25 +35,17 @@ func NewUserHandler(s *service.UserService, log *logger.Logger) *UserHandler {
 // @Security ApiKeyAuth
 // @Router /users [post]
 func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Create user attempt from IP: %s, request_id: %s", r.RemoteAddr, requestID)
-
 	var user models.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		h.log.Errorf("Error decoding create user request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.service.CreateUser(ctx, &user); err != nil {
-		h.log.Errorf("Failed to create user, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+	if err := h.service.CreateUser(r.Context(), &user); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("User created with ID: %d, request_id: %s", user.ID, requestID)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(user)
 }
@@ -72,26 +63,28 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /users/{id} [get]
 func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid user ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Fetching user with ID: %d, request_id: %s", id, requestID)
-	user, err := h.service.GetUser(ctx, id)
+	user, err := h.service.GetUser(r.Context(), id)
 	if err != nil {
-		h.log.Errorf("Failed to fetch user with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "User not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("User fetched with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -105,18 +98,12 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /users [get]
 func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Fetching all users, request_id: %s", requestID)
-	users, err := h.service.ListUsers(ctx)
+	users, err := h.service.ListUsers(r.Context())
 	if err != nil {
-		h.log.Errorf("Failed to fetch users, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Fetched %d users, request_id: %s", len(users), requestID)
 	json.NewEncoder(w).Encode(users)
 }
 
@@ -135,33 +122,34 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /users/{id} [put]
 func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid user ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Updating user with ID: %d, request_id: %s", id, requestID)
 	var user models.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		h.log.Errorf("Error decoding update user request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	user.ID = id
 
-	if err := h.service.UpdateUser(ctx, &user); err != nil {
-		h.log.Errorf("Failed to update user with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to update user", http.StatusInternalServerError)
+	if err := h.service.UpdateUser(r.Context(), &user); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("User updated with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -177,25 +165,27 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /users/{id} [delete]
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid user ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Deleting user with ID: %d, request_id: %s", id, requestID)
-	if err := h.service.DeleteUser(ctx, id); err != nil {
-		h.log.Errorf("Failed to delete user with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+	if err := h.service.DeleteUser(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("User deleted with ID: %d, request_id: %s", id, requestID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -210,41 +200,44 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {string} string "Password verified"
 // @Failure 400 {string} string "Invalid request body or ID"
 // @Failure 401 {string} string "Invalid password"
+// @Failure 404 {string} string "User not found"
 // @Failure 500 {string} string "Internal server error"
 // @Security ApiKeyAuth
 // @Router /users/{id}/verify-password [post]
 func (h *UserHandler) VerifyPassword(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid user ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	var input VerifyPasswordRequest
+	var input struct {
+		Password string `json:"password"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		h.log.Errorf("Error decoding verify password request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Verifying password for user ID: %d, request_id: %s", id, requestID)
-	if err := h.service.VerifyPassword(ctx, id, input.Password); err != nil {
-		h.log.Errorf("Password verification failed for user ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Invalid password", http.StatusUnauthorized)
+	if err := h.service.VerifyPassword(r.Context(), id, input.Password); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		if err.Error() == "invalid password" {
+			http.Error(w, "Invalid password", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Password verified for user ID: %d, request_id: %s", id, requestID)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Password verified"))
-}
-
-// VerifyPasswordRequest is the request body for password verification.
-type VerifyPasswordRequest struct {
-	Password string `json:"password"`
+	w.Write([]byte("Password verified successfully"))
 }

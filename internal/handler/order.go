@@ -1,26 +1,25 @@
 package handler
 
 import (
-	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
-	"github.com/alex-pyslar/online-store/internal/logger"
 	"github.com/alex-pyslar/online-store/internal/models"
 	"github.com/alex-pyslar/online-store/internal/service"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // OrderHandler handles requests to orders.
 type OrderHandler struct {
 	service *service.OrderService
-	log     *logger.Logger
 }
 
 // NewOrderHandler creates a new OrderHandler instance.
-func NewOrderHandler(s *service.OrderService, log *logger.Logger) *OrderHandler {
-	return &OrderHandler{service: s, log: log}
+func NewOrderHandler(s *service.OrderService) *OrderHandler {
+	return &OrderHandler{service: s}
 }
 
 // CreateOrder godoc
@@ -36,25 +35,17 @@ func NewOrderHandler(s *service.OrderService, log *logger.Logger) *OrderHandler 
 // @Security ApiKeyAuth
 // @Router /orders [post]
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Create order attempt from IP: %s, request_id: %s", r.RemoteAddr, requestID)
-
 	var order models.Order
 	if err := json.NewDecoder(r.Body).Decode(&order); err != nil {
-		h.log.Errorf("Error decoding create order request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.service.CreateOrder(ctx, &order); err != nil {
-		h.log.Errorf("Failed to create order, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to create order", http.StatusInternalServerError)
+	if err := h.service.CreateOrder(r.Context(), &order); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Order created with ID: %d, request_id: %s", order.ID, requestID)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(order)
 }
@@ -72,26 +63,28 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /orders/{id} [get]
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid order ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Fetching order with ID: %d, request_id: %s", id, requestID)
-	order, err := h.service.GetOrder(ctx, id)
+	order, err := h.service.GetOrder(r.Context(), id)
 	if err != nil {
-		h.log.Errorf("Failed to fetch order with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Order not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Order not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Order fetched with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(order)
 }
 
@@ -105,18 +98,12 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /orders [get]
 func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Fetching all orders, request_id: %s", requestID)
-	orders, err := h.service.ListOrders(ctx)
+	orders, err := h.service.ListOrders(r.Context())
 	if err != nil {
-		h.log.Errorf("Failed to fetch orders, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to fetch orders", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Fetched %d orders, request_id: %s", len(orders), requestID)
 	json.NewEncoder(w).Encode(orders)
 }
 
@@ -135,33 +122,34 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /orders/{id} [put]
 func (h *OrderHandler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid order ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Updating order with ID: %d, request_id: %s", id, requestID)
 	var order models.Order
 	if err := json.NewDecoder(r.Body).Decode(&order); err != nil {
-		h.log.Errorf("Error decoding update order request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	order.ID = id
 
-	if err := h.service.UpdateOrder(ctx, &order); err != nil {
-		h.log.Errorf("Failed to update order with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to update order", http.StatusInternalServerError)
+	if err := h.service.UpdateOrder(r.Context(), &order); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Order not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Order updated with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(order)
 }
 
@@ -177,24 +165,26 @@ func (h *OrderHandler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /orders/{id} [delete]
 func (h *OrderHandler) DeleteOrder(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid order ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Deleting order with ID: %d, request_id: %s", id, requestID)
-	if err := h.service.DeleteOrder(ctx, id); err != nil {
-		h.log.Errorf("Failed to delete order with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to delete order", http.StatusInternalServerError)
+	if err := h.service.DeleteOrder(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Order not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Order deleted with ID: %d, request_id: %s", id, requestID)
 	w.WriteHeader(http.StatusNoContent)
 }

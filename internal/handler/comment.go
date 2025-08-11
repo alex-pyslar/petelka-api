@@ -1,26 +1,25 @@
 package handler
 
 import (
-	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
-	"github.com/alex-pyslar/online-store/internal/logger"
 	"github.com/alex-pyslar/online-store/internal/models"
 	"github.com/alex-pyslar/online-store/internal/service"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // CommentHandler handles requests to comments.
 type CommentHandler struct {
 	service *service.CommentService
-	log     *logger.Logger
 }
 
 // NewCommentHandler creates a new CommentHandler instance.
-func NewCommentHandler(s *service.CommentService, log *logger.Logger) *CommentHandler {
-	return &CommentHandler{service: s, log: log}
+func NewCommentHandler(s *service.CommentService) *CommentHandler {
+	return &CommentHandler{service: s}
 }
 
 // CreateComment godoc
@@ -36,25 +35,17 @@ func NewCommentHandler(s *service.CommentService, log *logger.Logger) *CommentHa
 // @Security ApiKeyAuth
 // @Router /comments [post]
 func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Create comment attempt from IP: %s, request_id: %s", r.RemoteAddr, requestID)
-
 	var comment models.Comment
 	if err := json.NewDecoder(r.Body).Decode(&comment); err != nil {
-		h.log.Errorf("Error decoding create comment request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.service.CreateComment(ctx, &comment); err != nil {
-		h.log.Errorf("Failed to create comment, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to create comment", http.StatusInternalServerError)
+	if err := h.service.CreateComment(r.Context(), &comment); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Comment created with ID: %d, request_id: %s", comment.ID, requestID)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(comment)
 }
@@ -72,26 +63,28 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /comments/{id} [get]
 func (h *CommentHandler) GetComment(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid comment ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Fetching comment with ID: %d, request_id: %s", id, requestID)
-	comment, err := h.service.GetComment(ctx, id)
+	comment, err := h.service.GetComment(r.Context(), id)
 	if err != nil {
-		h.log.Errorf("Failed to fetch comment with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Comment not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Comment not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Comment fetched with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(comment)
 }
 
@@ -105,18 +98,12 @@ func (h *CommentHandler) GetComment(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /comments [get]
 func (h *CommentHandler) ListComments(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Fetching all comments, request_id: %s", requestID)
-	comments, err := h.service.ListComments(ctx)
+	comments, err := h.service.ListComments(r.Context())
 	if err != nil {
-		h.log.Errorf("Failed to fetch comments, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to fetch comments", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Fetched %d comments, request_id: %s", len(comments), requestID)
 	json.NewEncoder(w).Encode(comments)
 }
 
@@ -135,33 +122,34 @@ func (h *CommentHandler) ListComments(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /comments/{id} [put]
 func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid comment ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Updating comment with ID: %d, request_id: %s", id, requestID)
 	var comment models.Comment
 	if err := json.NewDecoder(r.Body).Decode(&comment); err != nil {
-		h.log.Errorf("Error decoding update comment request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	comment.ID = id
 
-	if err := h.service.UpdateComment(ctx, &comment); err != nil {
-		h.log.Errorf("Failed to update comment with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to update comment", http.StatusInternalServerError)
+	if err := h.service.UpdateComment(r.Context(), &comment); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Comment not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Comment updated with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(comment)
 }
 
@@ -177,24 +165,26 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /comments/{id} [delete]
 func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid comment ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Deleting comment with ID: %d, request_id: %s", id, requestID)
-	if err := h.service.DeleteComment(ctx, id); err != nil {
-		h.log.Errorf("Failed to delete comment with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to delete comment", http.StatusInternalServerError)
+	if err := h.service.DeleteComment(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Comment not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Comment deleted with ID: %d, request_id: %s", id, requestID)
 	w.WriteHeader(http.StatusNoContent)
 }

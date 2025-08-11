@@ -1,26 +1,25 @@
 package handler
 
 import (
-	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
-	"github.com/alex-pyslar/online-store/internal/logger"
 	"github.com/alex-pyslar/online-store/internal/models"
 	"github.com/alex-pyslar/online-store/internal/service"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // ProductHandler handles requests to products.
 type ProductHandler struct {
 	service *service.ProductService
-	log     *logger.Logger
 }
 
 // NewProductHandler creates a new ProductHandler instance.
-func NewProductHandler(s *service.ProductService, log *logger.Logger) *ProductHandler {
-	return &ProductHandler{service: s, log: log}
+func NewProductHandler(s *service.ProductService) *ProductHandler {
+	return &ProductHandler{service: s}
 }
 
 // CreateProduct godoc
@@ -36,25 +35,17 @@ func NewProductHandler(s *service.ProductService, log *logger.Logger) *ProductHa
 // @Security ApiKeyAuth
 // @Router /products [post]
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Create product attempt from IP: %s, request_id: %s", r.RemoteAddr, requestID)
-
 	var product models.Product
 	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
-		h.log.Errorf("Error decoding create product request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.service.CreateProduct(ctx, &product); err != nil {
-		h.log.Errorf("Failed to create product, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to create product", http.StatusInternalServerError)
+	if err := h.service.CreateProduct(r.Context(), &product); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Product created with ID: %d, request_id: %s", product.ID, requestID)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(product)
 }
@@ -72,26 +63,28 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /products/{id} [get]
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid product ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Fetching product with ID: %d, request_id: %s", id, requestID)
-	product, err := h.service.GetProduct(ctx, id)
+	product, err := h.service.GetProduct(r.Context(), id)
 	if err != nil {
-		h.log.Errorf("Failed to fetch product with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Product not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Product fetched with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(product)
 }
 
@@ -105,18 +98,12 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /products [get]
 func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
-	h.log.Infof("Fetching all products, request_id: %s", requestID)
-	products, err := h.service.ListProducts(ctx)
+	products, err := h.service.ListProducts(r.Context())
 	if err != nil {
-		h.log.Errorf("Failed to fetch products, request_id: %s: %v", requestID, err)
-		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Fetched %d products, request_id: %s", len(products), requestID)
 	json.NewEncoder(w).Encode(products)
 }
 
@@ -132,26 +119,24 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /products/category/{category_id} [get]
 func (h *ProductHandler) ListProductsByCategory(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	categoryID, err := getIDFromVars(vars, "category_id", h.log, requestID)
+	categoryIDStr, ok := vars["category_id"]
+	if !ok {
+		http.Error(w, "Category ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	categoryID, err := strconv.Atoi(categoryIDStr)
 	if err != nil {
-		h.log.Errorf("Invalid category ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		http.Error(w, "Invalid category ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Fetching products for category ID: %d, request_id: %s", categoryID, requestID)
-	products, err := h.service.ListProductsByCategory(ctx, categoryID)
+	products, err := h.service.ListProductsByCategory(r.Context(), categoryID)
 	if err != nil {
-		h.log.Errorf("Failed to fetch products for category ID %d, request_id: %s: %v", categoryID, requestID, err)
-		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Fetched %d products for category ID: %d, request_id: %s", len(products), categoryID, requestID)
 	json.NewEncoder(w).Encode(products)
 }
 
@@ -170,33 +155,34 @@ func (h *ProductHandler) ListProductsByCategory(w http.ResponseWriter, r *http.R
 // @Security ApiKeyAuth
 // @Router /products/{id} [put]
 func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid product ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Updating product with ID: %d, request_id: %s", id, requestID)
 	var product models.Product
 	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
-		h.log.Errorf("Error decoding update product request body, request_id: %s: %v", requestID, err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	product.ID = id
 
-	if err := h.service.UpdateProduct(ctx, &product); err != nil {
-		h.log.Errorf("Failed to update product with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to update product", http.StatusInternalServerError)
+	if err := h.service.UpdateProduct(r.Context(), &product); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Product updated with ID: %d, request_id: %s", id, requestID)
 	json.NewEncoder(w).Encode(product)
 }
 
@@ -212,24 +198,26 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Router /products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
-	requestID := uuid.New().String()
-	ctx := context.WithValue(r.Context(), "request_id", requestID)
-
 	vars := mux.Vars(r)
-	id, err := getIDFromVars(vars, "id", h.log, requestID)
+	idStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID is missing in parameters", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		h.log.Errorf("Invalid product ID in request, request_id: %s: %v", requestID, err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
-	h.log.Infof("Deleting product with ID: %d, request_id: %s", id, requestID)
-	if err := h.service.DeleteProduct(ctx, id); err != nil {
-		h.log.Errorf("Failed to delete product with ID %d, request_id: %s: %v", id, requestID, err)
-		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
+	if err := h.service.DeleteProduct(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Infof("Product deleted with ID: %d, request_id: %s", id, requestID)
 	w.WriteHeader(http.StatusNoContent)
 }
