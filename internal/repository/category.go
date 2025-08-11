@@ -25,7 +25,7 @@ func NewCategoryRepository(db *sql.DB, redis *redis.Client) *CategoryRepository 
 
 // CreateCategory создаёт новую категорию в базе данных.
 func (r *CategoryRepository) CreateCategory(ctx context.Context, category *models.Category) error {
-	query := `INSERT INTO categories (name, created_at) VALUES ($1, $2) RETURNING id`
+	query := `INSERT INTO categories (name) VALUES ($1, $2) RETURNING id`
 	err := r.db.QueryRowContext(ctx, query, category.Name, time.Now()).Scan(&category.ID)
 	if err != nil {
 		return err
@@ -46,8 +46,8 @@ func (r *CategoryRepository) GetCategory(ctx context.Context, id int) (*models.C
 	}
 
 	var category models.Category
-	query := `SELECT id, name, created_at FROM categories WHERE id = $1`
-	err = r.db.QueryRowContext(ctx, query, id).Scan(&category.ID, &category.Name, &category.CreatedAt)
+	query := `SELECT id, name FROM categories WHERE id = $1`
+	err = r.db.QueryRowContext(ctx, query, id).Scan(&category.ID, &category.Name)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, sql.ErrNoRows
@@ -65,7 +65,7 @@ func (r *CategoryRepository) GetCategory(ctx context.Context, id int) (*models.C
 
 // ListCategories получает список всех категорий.
 func (r *CategoryRepository) ListCategories(ctx context.Context) ([]*models.Category, error) {
-	query := `SELECT id, name, created_at FROM categories`
+	query := `SELECT id, name FROM categories`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (r *CategoryRepository) ListCategories(ctx context.Context) ([]*models.Cate
 	var categories []*models.Category
 	for rows.Next() {
 		var c models.Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name); err != nil {
 			return nil, err
 		}
 		categories = append(categories, &c)

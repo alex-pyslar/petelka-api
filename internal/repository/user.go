@@ -24,7 +24,7 @@ func NewUserRepository(db *sql.DB, redis *redis.Client) *UserRepository {
 
 // CreateUser создаёт нового пользователя в базе данных.
 func (r *UserRepository) CreateUser(ctx context.Context, user *models.User) error {
-	query := `INSERT INTO users (email, name, password, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	query := `INSERT INTO users (email, name, password, created_at) VALUES ($1, $2, $3, $4) RETURNING id`
 	err := r.db.QueryRowContext(ctx, query, user.Email, user.Name, user.Password, time.Now(), time.Now()).Scan(&user.ID)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (r *UserRepository) GetUser(ctx context.Context, id int) (*models.User, err
 	}
 
 	query := `SELECT id, email, name, password, created_at, updated_at FROM users WHERE id = $1`
-	err = r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.Name, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	err = r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Email, &user.Name, &user.Password, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -63,8 +63,8 @@ func (r *UserRepository) GetUser(ctx context.Context, id int) (*models.User, err
 // GetUserByEmail получает пользователя по email.
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
-	query := `SELECT id, email, name, password, created_at, updated_at FROM users WHERE email = $1`
-	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.Name, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	query := `SELECT id, email, name, password, created_at FROM users WHERE email = $1`
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Email, &user.Name, &user.Password, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -76,7 +76,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 
 // ListUsers получает список всех пользователей.
 func (r *UserRepository) ListUsers(ctx context.Context) ([]*models.User, error) {
-	query := `SELECT id, email, name, password, created_at, updated_at FROM users`
+	query := `SELECT id, email, name, password, created_at FROM users`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (r *UserRepository) ListUsers(ctx context.Context) ([]*models.User, error) 
 	var users []*models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Password, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Password, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -99,7 +99,7 @@ func (r *UserRepository) ListUsers(ctx context.Context) ([]*models.User, error) 
 
 // UpdateUser обновляет существующего пользователя.
 func (r *UserRepository) UpdateUser(ctx context.Context, user *models.User) error {
-	query := `UPDATE users SET email = $1, name = $2, password = $3, updated_at = $4 WHERE id = $5`
+	query := `UPDATE users SET email = $1, name = $2, password = $3 WHERE id = $5`
 	result, err := r.db.ExecContext(ctx, query, user.Email, user.Name, user.Password, time.Now(), user.ID)
 	if err != nil {
 		return err
