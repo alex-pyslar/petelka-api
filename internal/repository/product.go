@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alex-pyslar/online-store/internal/models"
@@ -131,13 +132,74 @@ func (r *ProductRepository) ListProducts(ctx context.Context) ([]*models.Product
 	return products, nil
 }
 
-// ListProductsByCategory получает список товаров по ID категории.
-func (r *ProductRepository) ListProductsByCategory(ctx context.Context, categoryID int) ([]*models.Product, error) {
+// SearchProducts выполняет поиск товаров с фильтрацией и пагинацией.
+func (r *ProductRepository) SearchProducts(
+	ctx context.Context,
+	name, productType string,
+	categoryID int,
+	color string,
+	page, limit int,
+) ([]*models.Product, int, error) {
+
+	var conditions []string
+	var args []interface{}
+	var countQueryArgs []interface{}
+	argIndex := 1
+
+	if name != "" {
+		conditions = append(conditions, fmt.Sprintf("LOWER(name) LIKE $%d", argIndex))
+		args = append(args, "%"+strings.ToLower(name)+"%")
+		countQueryArgs = append(countQueryArgs, "%"+strings.ToLower(name)+"%")
+		argIndex++
+	}
+	if productType != "" {
+		conditions = append(conditions, fmt.Sprintf("type = $%d", argIndex))
+		args = append(args, productType)
+		countQueryArgs = append(countQueryArgs, productType)
+		argIndex++
+	}
+	if categoryID > 0 {
+		conditions = append(conditions, fmt.Sprintf("category_id = $%d", argIndex))
+		args = append(args, categoryID)
+		countQueryArgs = append(countQueryArgs, categoryID)
+		argIndex++
+	}
+	if color != "" {
+		conditions = append(conditions, fmt.Sprintf("LOWER(color) LIKE $%d", argIndex))
+		args = append(args, "%"+strings.ToLower(color)+"%")
+		countQueryArgs = append(countQueryArgs, "%"+strings.ToLower(color)+"%")
+		argIndex++
+	}
+
 	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
-	          FROM products WHERE category_id = $1`
-	rows, err := r.db.QueryContext(ctx, query, categoryID)
+	          FROM products`
+	countQuery := `SELECT COUNT(*) FROM products`
+
+	if len(conditions) > 0 {
+		where := " WHERE " + strings.Join(conditions, " AND ")
+		query += where
+		countQuery += where
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+
+	query += fmt.Sprintf(" ORDER BY id LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+	args = append(args, limit, offset)
+
+	var totalCount int
+	if err := r.db.QueryRowContext(ctx, countQuery, countQueryArgs...).Scan(&totalCount); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -145,29 +207,21 @@ func (r *ProductRepository) ListProductsByCategory(ctx context.Context, category
 	for rows.Next() {
 		var p models.Product
 		if err := rows.Scan(
-			&p.ID,
-			&p.Name,
-			&p.Description,
-			&p.Price,
-			&p.CategoryID,
-			&p.Image,
-			&p.Type,
-			&p.Composition,
-			&p.CountryOfOrigin,
-			&p.LengthIn100g,
-			&p.Size,
-			&p.GarmentLength,
-			&p.Color,
+			&p.ID, &p.Name, &p.Description, &p.Price,
+			&p.CategoryID, &p.Image, &p.Type, &p.Composition,
+			&p.CountryOfOrigin, &p.LengthIn100g, &p.Size,
+			&p.GarmentLength, &p.Color,
 		); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		products = append(products, &p)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return products, nil
+
+	return products, totalCount, nil
 }
 
 // UpdateProduct обновляет существующий товар.

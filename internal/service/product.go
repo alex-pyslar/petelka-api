@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/alex-pyslar/online-store/internal/logger"
 	"github.com/alex-pyslar/online-store/internal/models"
 	"github.com/alex-pyslar/online-store/internal/repository"
@@ -129,18 +130,31 @@ func (s *ProductService) ListProducts(ctx context.Context) ([]*models.Product, e
 	return products, nil
 }
 
-// ListProductsByCategory возвращает товары по ID категории.
-func (s *ProductService) ListProductsByCategory(ctx context.Context, categoryID int) ([]*models.Product, error) {
-	s.log.Infof("Fetching products for category ID: %d", categoryID)
+func (s *ProductService) SearchProducts(
+	ctx context.Context,
+	name, productType string,
+	categoryID int,
+	color string,
+	page, limit int,
+) ([]*models.Product, int, error) {
 
-	products, err := s.repo.ListProductsByCategory(ctx, categoryID)
-	if err != nil {
-		s.log.Errorf("Failed to fetch products for category ID %d: %v", categoryID, err)
-		return nil, fmt.Errorf("failed to fetch products by category: %w", err)
+	s.log.Infof("Searching products: name=%s, type=%s, categoryID=%d, color=%s, page=%d, limit=%d",
+		name, productType, categoryID, color, page, limit)
+
+	if productType != "" && productType != "yarn" && productType != "garment" {
+		return nil, 0, fmt.Errorf("invalid product type: must be 'yarn' or 'garment'")
+	}
+	if categoryID < 0 {
+		return nil, 0, fmt.Errorf("category_id must be non-negative")
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if page <= 0 {
+		page = 1
 	}
 
-	s.log.Infof("Successfully fetched %d products for category ID: %d", len(products), categoryID)
-	return products, nil
+	return s.repo.SearchProducts(ctx, name, productType, categoryID, color, page, limit)
 }
 
 // UpdateProduct обновляет существующий товар.

@@ -113,37 +113,72 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(products)
 }
 
-// ListProductsByCategory godoc
-// @Summary List products by category ID
-// @Description Retrieve a list of products belonging to a specific category
+// SearchProducts godoc
+// @Summary Search products with filters and pagination
+// @Description Search products by name, type, category_id, and color with pagination
 // @Tags products
 // @Produce json
-// @Param category_id path int true "Category ID"
-// @Success 200 {array} models.Product "List of products"
-// @Failure 400 {string} string "Invalid category ID"
+// @Param name query string false "Product name (partial match)"
+// @Param type query string false "Product type (yarn or garment)"
+// @Param category_id query int false "Category ID"
+// @Param color query string false "Product color (partial match)"
+// @Param page query int false "Page number (default 1)"
+// @Param limit query int false "Items per page (default 10)"
+// @Success 200 {object} map[string]interface{} "List of products with total count"
+// @Failure 400 {string} string "Invalid query parameters"
 // @Failure 500 {string} string "Internal server error"
 // @Security ApiKeyAuth
-// @Router /products/category/{category_id} [get]
-func (h *ProductHandler) ListProductsByCategory(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	categoryIDStr, ok := vars["category_id"]
-	if !ok {
-		http.Error(w, "Category ID is missing in parameters", http.StatusBadRequest)
-		return
-	}
-	categoryID, err := strconv.Atoi(categoryIDStr)
-	if err != nil {
-		http.Error(w, "Invalid category ID format", http.StatusBadRequest)
-		return
+// @Router /products/search [get]
+func (h *ProductHandler) SearchProducts(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	name := q.Get("name")
+	productType := q.Get("type")
+	color := q.Get("color")
+
+	var categoryID int
+	if categoryIDStr := q.Get("category_id"); categoryIDStr != "" {
+		id, err := strconv.Atoi(categoryIDStr)
+		if err != nil {
+			http.Error(w, "Invalid category_id format", http.StatusBadRequest)
+			return
+		}
+		categoryID = id
 	}
 
-	products, err := h.service.ListProductsByCategory(r.Context(), categoryID)
+	page := 1
+	if pageStr := q.Get("page"); pageStr != "" {
+		p, err := strconv.Atoi(pageStr)
+		if err != nil {
+			http.Error(w, "Invalid page format", http.StatusBadRequest)
+			return
+		}
+		page = p
+	}
+
+	limit := 10
+	if limitStr := q.Get("limit"); limitStr != "" {
+		l, err := strconv.Atoi(limitStr)
+		if err != nil {
+			http.Error(w, "Invalid limit format", http.StatusBadRequest)
+			return
+		}
+		limit = l
+	}
+
+	products, totalCount, err := h.service.SearchProducts(r.Context(), name, productType, categoryID, color, page, limit)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(products)
+	resp := map[string]interface{}{
+		"products":    products,
+		"total_count": totalCount,
+		"page":        page,
+		"limit":       limit,
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 // UpdateProduct godoc
