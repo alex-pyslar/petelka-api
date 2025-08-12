@@ -30,7 +30,7 @@ func NewProductHandler(s *service.ProductService) *ProductHandler {
 // @Produce json
 // @Param product body models.Product true "Product object"
 // @Success 201 {object} models.Product "Product created successfully"
-// @Failure 400 {string} string "Invalid request body"
+// @Failure 400 {string} string "Invalid request body or product type"
 // @Failure 500 {string} string "Internal server error"
 // @Security ApiKeyAuth
 // @Router /products [post]
@@ -38,6 +38,12 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var product models.Product
 	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Проверка поля Type
+	if product.Type != "yarn" && product.Type != "garment" {
+		http.Error(w, "Invalid product type: must be 'yarn' or 'garment'", http.StatusBadRequest)
 		return
 	}
 
@@ -149,7 +155,7 @@ func (h *ProductHandler) ListProductsByCategory(w http.ResponseWriter, r *http.R
 // @Param id path int true "Product ID"
 // @Param product body models.Product true "Product object with updated fields"
 // @Success 200 {object} models.Product "Product updated successfully"
-// @Failure 400 {string} string "Invalid request body or ID"
+// @Failure 400 {string} string "Invalid request body or product type"
 // @Failure 404 {string} string "Product not found"
 // @Failure 500 {string} string "Internal server error"
 // @Security ApiKeyAuth
@@ -173,6 +179,12 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	product.ID = id
+
+	// Проверка поля Type
+	if product.Type != "yarn" && product.Type != "garment" {
+		http.Error(w, "Invalid product type: must be 'yarn' or 'garment'", http.StatusBadRequest)
+		return
+	}
 
 	if err := h.service.UpdateProduct(r.Context(), &product); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

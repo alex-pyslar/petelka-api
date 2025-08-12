@@ -24,8 +24,22 @@ func NewProductRepository(db *sql.DB, redis *redis.Client) *ProductRepository {
 
 // CreateProduct создаёт новый товар в базе данных.
 func (r *ProductRepository) CreateProduct(ctx context.Context, product *models.Product) error {
-	query := `INSERT INTO products (name, description, price) VALUES ($1, $2, $3, $4) RETURNING id`
-	err := r.db.QueryRowContext(ctx, query, product.Name, product.Description, product.Price, time.Now()).Scan(&product.ID)
+	query := `INSERT INTO products (name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`
+	err := r.db.QueryRowContext(ctx, query,
+		product.Name,
+		product.Description,
+		product.Price,
+		product.CategoryID,
+		product.Image,
+		product.Type,
+		product.Composition,
+		product.CountryOfOrigin,
+		product.LengthIn100g,
+		product.Size,
+		product.GarmentLength,
+		product.Color,
+	).Scan(&product.ID)
 	if err != nil {
 		return err
 	}
@@ -46,8 +60,23 @@ func (r *ProductRepository) GetProduct(ctx context.Context, id int) (*models.Pro
 	}
 
 	// Если в кэше нет, получаем из БД
-	query := `SELECT id, name, description, price FROM products WHERE id = $1`
-	err = r.db.QueryRowContext(ctx, query, id).Scan(&product.ID, &product.Name, &product.Description, &product.Price)
+	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
+	          FROM products WHERE id = $1`
+	err = r.db.QueryRowContext(ctx, query, id).Scan(
+		&product.ID,
+		&product.Name,
+		&product.Description,
+		&product.Price,
+		&product.CategoryID,
+		&product.Image,
+		&product.Type,
+		&product.Composition,
+		&product.CountryOfOrigin,
+		&product.LengthIn100g,
+		&product.Size,
+		&product.GarmentLength,
+		&product.Color,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -65,7 +94,8 @@ func (r *ProductRepository) GetProduct(ctx context.Context, id int) (*models.Pro
 
 // ListProducts получает список всех товаров.
 func (r *ProductRepository) ListProducts(ctx context.Context) ([]*models.Product, error) {
-	query := `SELECT id, name, description, price, category_id FROM products`
+	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
+	          FROM products`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -75,7 +105,21 @@ func (r *ProductRepository) ListProducts(ctx context.Context) ([]*models.Product
 	var products []*models.Product
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.CategoryID); err != nil {
+		if err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.Description,
+			&p.Price,
+			&p.CategoryID,
+			&p.Image,
+			&p.Type,
+			&p.Composition,
+			&p.CountryOfOrigin,
+			&p.LengthIn100g,
+			&p.Size,
+			&p.GarmentLength,
+			&p.Color,
+		); err != nil {
 			return nil, err
 		}
 		products = append(products, &p)
@@ -89,7 +133,8 @@ func (r *ProductRepository) ListProducts(ctx context.Context) ([]*models.Product
 
 // ListProductsByCategory получает список товаров по ID категории.
 func (r *ProductRepository) ListProductsByCategory(ctx context.Context, categoryID int) ([]*models.Product, error) {
-	query := `SELECT id, name, description, price, category_id FROM products WHERE category_id = $1`
+	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
+	          FROM products WHERE category_id = $1`
 	rows, err := r.db.QueryContext(ctx, query, categoryID)
 	if err != nil {
 		return nil, err
@@ -99,7 +144,21 @@ func (r *ProductRepository) ListProductsByCategory(ctx context.Context, category
 	var products []*models.Product
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.CategoryID); err != nil {
+		if err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.Description,
+			&p.Price,
+			&p.CategoryID,
+			&p.Image,
+			&p.Type,
+			&p.Composition,
+			&p.CountryOfOrigin,
+			&p.LengthIn100g,
+			&p.Size,
+			&p.GarmentLength,
+			&p.Color,
+		); err != nil {
 			return nil, err
 		}
 		products = append(products, &p)
@@ -113,8 +172,24 @@ func (r *ProductRepository) ListProductsByCategory(ctx context.Context, category
 
 // UpdateProduct обновляет существующий товар.
 func (r *ProductRepository) UpdateProduct(ctx context.Context, product *models.Product) error {
-	query := `UPDATE products SET name = $1, description = $2, price = $3, category_id = $4 WHERE id = $5`
-	result, err := r.db.ExecContext(ctx, query, product.Name, product.Description, product.Price, product.CategoryID, product.ID)
+	query := `UPDATE products SET name = $1, description = $2, price = $3, category_id = $4, image = $5, type = $6, 
+	          composition = $7, country_of_origin = $8, length_in_100g = $9, size = $10, garment_length = $11, color = $12 
+	          WHERE id = $13`
+	result, err := r.db.ExecContext(ctx, query,
+		product.Name,
+		product.Description,
+		product.Price,
+		product.CategoryID,
+		product.Image,
+		product.Type,
+		product.Composition,
+		product.CountryOfOrigin,
+		product.LengthIn100g,
+		product.Size,
+		product.GarmentLength,
+		product.Color,
+		product.ID,
+	)
 	if err != nil {
 		return err
 	}

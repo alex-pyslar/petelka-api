@@ -17,7 +17,15 @@ CREATE TABLE products (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL,
-    category_id INT REFERENCES categories(id)
+    image TEXT NOT NULL,
+    category_id INT REFERENCES categories(id),
+    type VARCHAR(50) NOT NULL,
+    composition VARCHAR(255),
+    country_of_origin VARCHAR(100),
+    length_in_100g INT,
+    size VARCHAR(50),
+    garment_length VARCHAR(50),
+    color VARCHAR(50)
 );
 
 CREATE TABLE orders (
