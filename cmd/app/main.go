@@ -62,8 +62,8 @@ func main() {
 	public.HandleFunc("/auth/register", authHandler.Register).Methods("POST")
 	public.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
 	public.HandleFunc("/products", productHandler.ListProducts).Methods("GET")
-	public.HandleFunc("/products/{id}", productHandler.GetProduct).Methods("GET")
 	public.HandleFunc("/products/search", productHandler.SearchProducts).Methods("GET")
+	public.HandleFunc("/products/{id}", productHandler.GetProduct).Methods("GET")
 	public.HandleFunc("/categories", categoryHandler.ListCategories).Methods("GET")
 	public.HandleFunc("/categories/{id}", categoryHandler.GetCategory).Methods("GET")
 
