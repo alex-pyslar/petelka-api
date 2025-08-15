@@ -2,9 +2,9 @@ package tests
 
 import (
 	"context"
-	"github.com/alex-pyslar/online-store/internal/models"
-	"github.com/alex-pyslar/online-store/internal/repository"
-	"github.com/alex-pyslar/online-store/internal/service"
+	"github.com/alex-pyslar/petelka-api/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/repository"
+	"github.com/alex-pyslar/petelka-api/internal/service"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -8,13 +8,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger"
 
-	"github.com/alex-pyslar/online-store/internal/config"
-	"github.com/alex-pyslar/online-store/internal/handler"
-	"github.com/alex-pyslar/online-store/internal/logger"
-	"github.com/alex-pyslar/online-store/internal/repository"
-	"github.com/alex-pyslar/online-store/internal/service"
+	"github.com/alex-pyslar/petelka-api/internal/config"
+	"github.com/alex-pyslar/petelka-api/internal/handler"
+	"github.com/alex-pyslar/petelka-api/internal/logger"
+	"github.com/alex-pyslar/petelka-api/internal/repository"
+	"github.com/alex-pyslar/petelka-api/internal/service"
 
-	_ "github.com/alex-pyslar/online-store/docs"
+	_ "github.com/alex-pyslar/petelka-api/docs"
 )
 
 func main() {

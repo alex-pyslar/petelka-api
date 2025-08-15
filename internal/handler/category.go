@@ -3,11 +3,11 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/alex-pyslar/online-store/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/models"
 	"net/http"
 	"strconv"
 
-	"github.com/alex-pyslar/online-store/internal/service"
+	"github.com/alex-pyslar/petelka-api/internal/service"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )

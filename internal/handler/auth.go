@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alex-pyslar/online-store/internal/models"
-	"github.com/alex-pyslar/online-store/internal/service"
+	"github.com/alex-pyslar/petelka-api/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/service"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 )

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alex-pyslar/online-store/internal/logger"
+	"github.com/alex-pyslar/petelka-api/internal/logger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )

@@ -3,7 +3,7 @@ package config
 import (
 	"context"
 	"database/sql"
-	"github.com/alex-pyslar/online-store/internal/logger"
+	"github.com/alex-pyslar/petelka-api/internal/logger"
 	"os"
 
 	"github.com/joho/godotenv"

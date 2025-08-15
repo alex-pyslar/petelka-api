@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alex-pyslar/online-store/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/models"
 	"github.com/redis/go-redis/v9"
 )
 

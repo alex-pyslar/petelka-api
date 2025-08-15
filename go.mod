@@ -1,4 +1,4 @@
-module github.com/alex-pyslar/online-store
+module github.com/alex-pyslar/petelka-api
 
 go 1.24.5
 

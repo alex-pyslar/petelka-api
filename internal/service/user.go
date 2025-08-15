@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/alex-pyslar/online-store/internal/logger"
-	"github.com/alex-pyslar/online-store/internal/models"
-	"github.com/alex-pyslar/online-store/internal/repository"
+	"github.com/alex-pyslar/petelka-api/internal/logger"
+	"github.com/alex-pyslar/petelka-api/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/repository"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )

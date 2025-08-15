@@ -3,9 +3,9 @@ package tests
 import (
 	"context"
 	"database/sql"
-	"github.com/alex-pyslar/online-store/internal/models"
-	"github.com/alex-pyslar/online-store/internal/repository"
-	"github.com/alex-pyslar/online-store/internal/service"
+	"github.com/alex-pyslar/petelka-api/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/repository"
+	"github.com/alex-pyslar/petelka-api/internal/service"
 	"github.com/redis/go-redis/v9"
 	"testing"
 

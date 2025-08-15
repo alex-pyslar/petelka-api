@@ -1,12 +1,12 @@
 echo "Загрузка последней версии backend'а из репозитория"
 git pull
 echo "Удаление старого контейнера"
-docker rm -f online-store
+docker rm -f petelka-api
 echo "Удаление старого образа"
-docker image rm -f online-store:latest
+docker image rm -f petelka-api:latest
 echo "Создание нового образа"
-docker build -t online-store:latest .
+docker build -t petelka-api:latest .
 echo "Запуск контейнера из нового образа"
-docker run --name online-store -d -p 8080:8080 online-store:latest
-docker update --restart=always online-store
+docker run --name petelka-api -d -p 8080:8080 petelka-api:latest
+docker update --restart=always petelka-api
 echo "Deploy завершён"

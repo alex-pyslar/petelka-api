@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/alex-pyslar/online-store/internal/models"
-	"github.com/alex-pyslar/online-store/internal/service"
+	"github.com/alex-pyslar/petelka-api/internal/models"
+	"github.com/alex-pyslar/petelka-api/internal/service"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
