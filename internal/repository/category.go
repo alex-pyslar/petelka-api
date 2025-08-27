@@ -25,7 +25,7 @@ func NewCategoryRepository(db *sql.DB, redis *redis.Client) *CategoryRepository 
 
 // CreateCategory создаёт новую категорию в базе данных.
 func (r *CategoryRepository) CreateCategory(ctx context.Context, category *models.Category) error {
-	query := `INSERT INTO categories (name, type) VALUES ($1) RETURNING id`
+	query := `INSERT INTO categories (name, type) VALUES ($1, $2) RETURNING id`
 	err := r.db.QueryRowContext(ctx, query, category.Name, category.Type).Scan(&category.ID)
 	if err != nil {
 		return err
