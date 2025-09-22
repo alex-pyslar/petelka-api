@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alex-pyslar/petelka-api/internal/models"
+	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -25,14 +26,14 @@ func NewProductRepository(db *sql.DB, redis *redis.Client) *ProductRepository {
 
 // CreateProduct создаёт новый товар в базе данных.
 func (r *ProductRepository) CreateProduct(ctx context.Context, product *models.Product) error {
-	query := `INSERT INTO products (name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color) 
-	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`
+	query := `INSERT INTO products (name, description, price, category_id, images, type, composition, country_of_origin, length_in_100g, size, garment_length, color) 
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`
 	err := r.db.QueryRowContext(ctx, query,
 		product.Name,
 		product.Description,
 		product.Price,
 		product.CategoryID,
-		product.Image,
+		pq.Array(product.Images),
 		product.Type,
 		product.Composition,
 		product.CountryOfOrigin,
@@ -61,7 +62,7 @@ func (r *ProductRepository) GetProduct(ctx context.Context, id int) (*models.Pro
 	}
 
 	// Если в кэше нет, получаем из БД
-	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
+	query := `SELECT id, name, description, price, category_id, images, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
 	          FROM products WHERE id = $1`
 	err = r.db.QueryRowContext(ctx, query, id).Scan(
 		&product.ID,
@@ -69,7 +70,7 @@ func (r *ProductRepository) GetProduct(ctx context.Context, id int) (*models.Pro
 		&product.Description,
 		&product.Price,
 		&product.CategoryID,
-		&product.Image,
+		pq.Array(&product.Images),
 		&product.Type,
 		&product.Composition,
 		&product.CountryOfOrigin,
@@ -95,7 +96,7 @@ func (r *ProductRepository) GetProduct(ctx context.Context, id int) (*models.Pro
 
 // ListProducts получает список всех товаров.
 func (r *ProductRepository) ListProducts(ctx context.Context) ([]*models.Product, error) {
-	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
+	query := `SELECT id, name, description, price, category_id, images, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
 	          FROM products`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -112,7 +113,7 @@ func (r *ProductRepository) ListProducts(ctx context.Context) ([]*models.Product
 			&p.Description,
 			&p.Price,
 			&p.CategoryID,
-			&p.Image,
+			pq.Array(&p.Images),
 			&p.Type,
 			&p.Composition,
 			&p.CountryOfOrigin,
@@ -171,7 +172,7 @@ func (r *ProductRepository) SearchProducts(
 		argIndex++
 	}
 
-	query := `SELECT id, name, description, price, category_id, image, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
+	query := `SELECT id, name, description, price, category_id, images, type, composition, country_of_origin, length_in_100g, size, garment_length, color 
 	          FROM products`
 	countQuery := `SELECT COUNT(*) FROM products`
 
@@ -208,7 +209,7 @@ func (r *ProductRepository) SearchProducts(
 		var p models.Product
 		if err := rows.Scan(
 			&p.ID, &p.Name, &p.Description, &p.Price,
-			&p.CategoryID, &p.Image, &p.Type, &p.Composition,
+			&p.CategoryID, pq.Array(&p.Images), &p.Type, &p.Composition,
 			&p.CountryOfOrigin, &p.LengthIn100g, &p.Size,
 			&p.GarmentLength, &p.Color,
 		); err != nil {
@@ -226,7 +227,7 @@ func (r *ProductRepository) SearchProducts(
 
 // UpdateProduct обновляет существующий товар.
 func (r *ProductRepository) UpdateProduct(ctx context.Context, product *models.Product) error {
-	query := `UPDATE products SET name = $1, description = $2, price = $3, category_id = $4, image = $5, type = $6, 
+	query := `UPDATE products SET name = $1, description = $2, price = $3, category_id = $4, images = $5, type = $6, 
 	          composition = $7, country_of_origin = $8, length_in_100g = $9, size = $10, garment_length = $11, color = $12 
 	          WHERE id = $13`
 	result, err := r.db.ExecContext(ctx, query,
@@ -234,7 +235,7 @@ func (r *ProductRepository) UpdateProduct(ctx context.Context, product *models.P
 		product.Description,
 		product.Price,
 		product.CategoryID,
-		product.Image,
+		pq.Array(product.Images),
 		product.Type,
 		product.Composition,
 		product.CountryOfOrigin,

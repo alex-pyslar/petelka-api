@@ -31,8 +31,8 @@ func (s *ProductService) validateProduct(product *models.Product) error {
 	if product.Price <= 0 {
 		return fmt.Errorf("price must be greater than 0")
 	}
-	if product.Image == "" {
-		return fmt.Errorf("image is required")
+	if len(product.Images) == 0 {
+		return fmt.Errorf("at least one image is required")
 	}
 	if product.CategoryID <= 0 {
 		return fmt.Errorf("category_id must be greater than 0")

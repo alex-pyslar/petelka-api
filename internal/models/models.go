@@ -14,19 +14,19 @@ type User struct {
 
 // Product представляет товар (пряжа или готовое изделие).
 type Product struct {
-	ID              int     `json:"id"`
-	Name            string  `json:"name"`
-	Description     string  `json:"description"`
-	Price           float64 `json:"price"`
-	Image           string  `json:"image"`
-	CategoryID      int     `json:"category_id"`
-	Type            string  `json:"type"`
-	Composition     string  `json:"composition,omitempty"`
-	CountryOfOrigin string  `json:"country_of_origin,omitempty"`
-	LengthIn100g    int     `json:"length_in_100g,omitempty"`
-	Size            string  `json:"size,omitempty"`
-	GarmentLength   string  `json:"garment_length,omitempty"`
-	Color           string  `json:"color,omitempty"`
+	ID              int      `json:"id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	Price           float64  `json:"price"`
+	Images          []string `json:"images"`
+	CategoryID      int      `json:"category_id"`
+	Type            string   `json:"type"`
+	Composition     string   `json:"composition,omitempty"`
+	CountryOfOrigin string   `json:"country_of_origin,omitempty"`
+	LengthIn100g    int      `json:"length_in_100g,omitempty"`
+	Size            string   `json:"size,omitempty"`
+	GarmentLength   string   `json:"garment_length,omitempty"`
+	Color           string   `json:"color,omitempty"`
 }
 
 // Category представляет категорию товаров.
