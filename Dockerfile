@@ -10,7 +10,7 @@ COPY . .
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN swag init -g cmd/app/main.go --output docs
 
-RUN go build -o petelka-api cmd/appy/main.go
+RUN go build -o petelka-api cmd/app/main.go
 
 FROM alpine:latest
 
