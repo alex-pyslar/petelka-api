@@ -3,17 +3,23 @@ package config
 import (
 	"context"
 	"database/sql"
-	"github.com/alex-pyslar/petelka-api/internal/logger"
+	"fmt"
 	"os"
 
+	"github.com/alex-pyslar/petelka-api/internal/logger"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 )
 
 type Config struct {
-	DB    *sql.DB
-	Redis *redis.Client
+	DB             *sql.DB
+	Redis          *redis.Client
+	MinioEndpoint  string
+	MinioAccessKey string
+	MinioSecretKey string
+	MinioBucket    string
+	MinioUseSSL    bool
 }
 
 func NewConfig(log *logger.Logger) (*Config, error) {
@@ -22,7 +28,7 @@ func NewConfig(log *logger.Logger) (*Config, error) {
 		log.Warningf("Failed to load .env file: %v", err)
 	}
 
-	// PostgreSQL
+	// --- PostgreSQL ---
 	dbConnStr := os.Getenv("DATABASE_URL")
 	if dbConnStr == "" {
 		log.Fatal("DATABASE_URL is not set")
@@ -38,7 +44,7 @@ func NewConfig(log *logger.Logger) (*Config, error) {
 	}
 	log.Info("Connected to PostgreSQL successfully")
 
-	// Redis
+	// --- Redis ---
 	redisAddr := os.Getenv("REDIS_URL")
 	if redisAddr == "" {
 		log.Fatal("REDIS_URL is not set")
@@ -54,5 +60,26 @@ func NewConfig(log *logger.Logger) (*Config, error) {
 	}
 	log.Info("Connected to Redis successfully")
 
-	return &Config{DB: db, Redis: redisClient}, nil
+	// --- MinIO ---
+	minioEndpoint := os.Getenv("MINIO_ENDPOINT")
+	minioAccessKey := os.Getenv("MINIO_ACCESS_KEY")
+	minioSecretKey := os.Getenv("MINIO_SECRET_KEY")
+	minioBucket := os.Getenv("MINIO_BUCKET")
+	minioUseSSL := os.Getenv("MINIO_USE_SSL") == "true"
+
+	if minioEndpoint == "" || minioAccessKey == "" || minioSecretKey == "" || minioBucket == "" {
+		return nil, fmt.Errorf("MinIO config missing: MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET")
+	}
+
+	log.Info("MinIO configuration loaded")
+
+	return &Config{
+		DB:             db,
+		Redis:          redisClient,
+		MinioEndpoint:  minioEndpoint,
+		MinioAccessKey: minioAccessKey,
+		MinioSecretKey: minioSecretKey,
+		MinioBucket:    minioBucket,
+		MinioUseSSL:    minioUseSSL,
+	}, nil
 }

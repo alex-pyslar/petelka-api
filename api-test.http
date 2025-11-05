@@ -1,0 +1,243 @@
+### Auth: Register new user
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "password123",
+  "role": "user"
+}
+
+> {%
+    // Скрипт для извлечения ID пользователя из ответа (если нужно)
+    client.global.set("user_id", response.body.id);
+%}
+
+### Auth: Login and get token
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+> {%
+    // Извлекаем токен из ответа и сохраняем в глобальную переменную
+    client.global.set("token", response.body.token);
+    client.log("Token saved: " + client.global.get("token"));
+%}
+
+### Categories: List all categories (requires auth)
+GET {{host}}/categories
+Authorization: Bearer {{token}}
+
+### Categories: Create new category (requires auth)
+POST {{host}}/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Test Category",
+  "type": "yarn"
+}
+
+> {%
+    // Сохраняем ID новой категории
+    client.global.set("category_id", response.body.id);
+%}
+
+### Categories: Get category by ID (requires auth)
+GET {{host}}/categories/{{category_id}}
+Authorization: Bearer {{token}}
+
+### Categories: Update category (requires auth)
+PUT {{host}}/categories/{{category_id}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Updated Category",
+  "type": "garment"
+}
+
+### Categories: Delete category (requires auth)
+DELETE {{host}}/categories/{{category_id}}
+Authorization: Bearer {{token}}
+
+### Comments: List all comments (requires auth)
+GET {{host}}/comments
+Authorization: Bearer {{token}}
+
+### Comments: Create new comment (requires auth)
+POST {{host}}/comments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "product_id": 1,
+  "user_id": {{user_id}},
+  "text": "This is a test comment"
+}
+
+> {%
+    client.global.set("comment_id", response.body.id);
+%}
+
+### Comments: Get comment by ID (requires auth)
+GET {{host}}/comments/{{comment_id}}
+Authorization: Bearer {{token}}
+
+### Comments: Update comment (requires auth)
+PUT {{host}}/comments/{{comment_id}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "text": "Updated test comment"
+}
+
+### Comments: Delete comment (requires auth)
+DELETE {{host}}/comments/{{comment_id}}
+Authorization: Bearer {{token}}
+
+### Orders: List all orders (requires auth)
+GET {{host}}/orders
+Authorization: Bearer {{token}}
+
+### Orders: Create new order (requires auth)
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "user_id": {{user_id}},
+  "total": 99.99,
+  "status": "pending"
+}
+
+> {%
+    client.global.set("order_id", response.body.id);
+%}
+
+### Orders: Get order by ID (requires auth)
+GET {{host}}/orders/{{order_id}}
+Authorization: Bearer {{token}}
+
+### Orders: Update order (requires auth)
+PUT {{host}}/orders/{{order_id}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "shipped",
+  "total": 109.99
+}
+
+### Orders: Delete order (requires auth)
+DELETE {{host}}/orders/{{order_id}}
+Authorization: Bearer {{token}}
+
+### Photos: Upload photo (requires auth)
+POST {{host}}/photos
+Content-Type: multipart/form-data
+Authorization: Bearer {{token}}
+
+file@test.jpg
+
+> {%
+    client.global.set("object_name", response.body.objectName);
+    client.global.set("photo_url", response.body.url);
+%}
+
+### Photos: Get photo download URL (no auth specified, but check if needed)
+GET {{host}}/photos/{{object_name}}
+
+### Products: List all products (requires auth)
+GET {{host}}/products
+Authorization: Bearer {{token}}
+
+### Products: Search products (requires auth)
+GET {{host}}/products/search?name=Test&type=yarn&category_id=1&color=red&page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Products: Create new product (requires auth)
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Test Product",
+  "type": "yarn",
+  "category_id": 1,
+  "price": 19.99,
+  "description": "Test description",
+  "color": "blue",
+  "composition": "cotton",
+  "country_of_origin": "USA",
+  "length_in_100g": 200,
+  "size": "M",
+  "garment_length": "long",
+  "images": ["image1.jpg"]
+}
+
+> {%
+    client.global.set("product_id", response.body.id);
+%}
+
+### Products: Get product by ID (requires auth)
+GET {{host}}/products/{{product_id}}
+Authorization: Bearer {{token}}
+
+### Products: Update product (requires auth)
+PUT {{host}}/products/{{product_id}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Updated Product",
+  "price": 29.99
+}
+
+### Products: Delete product (requires auth)
+DELETE {{host}}/products/{{product_id}}
+Authorization: Bearer {{token}}
+
+### Users: List all users (requires auth)
+GET {{host}}/users
+Authorization: Bearer {{token}}
+
+### Users: Create new user (requires auth, probably admin)
+POST {{host}}/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "New User",
+  "email": "new@example.com",
+  "password": "newpass123",
+  "role": "user"
+}
+
+> {%
+    client.global.set("new_user_id", response.body.id);
+%}
+
+### Users: Get user by ID (requires auth)
+GET {{host}}/users/{{user_id}}
+Authorization: Bearer {{token}}
+
+### Users: Update user (requires auth)
+PUT {{host}}/users/{{user_id}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Updated Test User",
+  "email": "updated@example.com"
+}
+
+### Users: Delete user (requires auth)
+DELETE {{host}}/users/{{new_user_id}}
+Authorization: Bearer {{token}}

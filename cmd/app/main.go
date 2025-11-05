@@ -18,11 +18,13 @@ import (
 )
 
 func main() {
+	// Инициализация логгера
 	log, err := logger.NewLogger()
 	if err != nil {
 		panic(err)
 	}
 
+	// Инициализация конфигурации (DB, Redis, MinIO)
 	cfg, err := config.NewConfig(log)
 	if err != nil {
 		log.Fatalf("Error initializing config: %v", err)
@@ -31,33 +33,49 @@ func main() {
 	defer cfg.Redis.Close()
 	log.Info("Connected to PostgreSQL and Redis successfully")
 
-	// Инициализация репозиториев
+	// === Репозитории ===
 	userRepo := repository.NewUserRepository(cfg.DB, cfg.Redis)
 	productRepo := repository.NewProductRepository(cfg.DB, cfg.Redis)
 	categoryRepo := repository.NewCategoryRepository(cfg.DB, cfg.Redis)
 	orderRepo := repository.NewOrderRepository(cfg.DB, cfg.Redis)
 	commentRepo := repository.NewCommentRepository(cfg.DB, cfg.Redis)
 
-	// Инициализация сервисов
+	// MinIO как репозиторий
+	photoRepo, err := repository.NewPhotoRepository(
+		cfg.MinioEndpoint,
+		cfg.MinioAccessKey,
+		cfg.MinioSecretKey,
+		cfg.MinioBucket,
+		cfg.MinioUseSSL,
+		cfg.Redis, // только Redis для кэша
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize PhotoRepository: %v", err)
+	}
+
+	// === Сервисы ===
 	userService := service.NewUserService(userRepo, log)
 	productService := service.NewProductService(productRepo, log)
 	categoryService := service.NewCategoryService(categoryRepo, log)
 	orderService := service.NewOrderService(orderRepo, log)
 	commentService := service.NewCommentService(commentRepo, log)
+	photoService := service.NewPhotoService(photoRepo, log)
 
-	// Инициализация хендлеров
+	// === Хендлеры ===
 	userHandler := handler.NewUserHandler(userService)
 	productHandler := handler.NewProductHandler(productService)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 	orderHandler := handler.NewOrderHandler(orderService)
 	commentHandler := handler.NewCommentHandler(commentService)
 	authHandler := handler.NewAuthHandler(userService)
+	photoHandler := handler.NewPhotoHandler(photoService)
 
+	// === Роутинг ===
 	router := mux.NewRouter()
-	router.Use(handler.CorsMiddleware) // Применяем CORS ко всем запросам
+	router.Use(handler.CorsMiddleware)
 	api := router.PathPrefix("/api").Subrouter()
 
-	// --- Public маршруты (доступны всем) ---
+	// --- Публичные маршруты ---
 	public := api.PathPrefix("").Subrouter()
 	public.HandleFunc("/auth/register", authHandler.Register).Methods("POST")
 	public.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
@@ -66,16 +84,17 @@ func main() {
 	public.HandleFunc("/products/{id}", productHandler.GetProduct).Methods("GET")
 	public.HandleFunc("/categories", categoryHandler.ListCategories).Methods("GET")
 	public.HandleFunc("/categories/{id}", categoryHandler.GetCategory).Methods("GET")
+	public.HandleFunc("/download/{objectName}", photoHandler.Download).Methods("GET")
 
-	// --- Protected маршруты (доступны авторизованным пользователям) ---
+	// --- Защищённые маршруты ---
 	protected := api.PathPrefix("").Subrouter()
-	protected.Use(handler.AuthMiddleware(log))                                      // Проверяем авторизацию
-	protected.HandleFunc("/comments", commentHandler.CreateComment).Methods("POST") // Создание комментария
-	protected.HandleFunc("/orders", orderHandler.CreateOrder).Methods("POST")       // Создание заказа
+	protected.Use(handler.AuthMiddleware(log))
+	protected.HandleFunc("/comments", commentHandler.CreateComment).Methods("POST")
+	protected.HandleFunc("/orders", orderHandler.CreateOrder).Methods("POST")
 
-	// --- Admin маршруты (доступны только администраторам) ---
+	// --- Админские маршруты ---
 	admin := api.PathPrefix("").Subrouter()
-	admin.Use(handler.AuthMiddleware(log), handler.AdminMiddleware(log)) // Сначала авторизация, потом проверка роли
+	admin.Use(handler.AuthMiddleware(log), handler.AdminMiddleware(log))
 	admin.HandleFunc("/products", productHandler.CreateProduct).Methods("POST")
 	admin.HandleFunc("/products/{id}", productHandler.UpdateProduct).Methods("PUT")
 	admin.HandleFunc("/products/{id}", productHandler.DeleteProduct).Methods("DELETE")
@@ -85,8 +104,9 @@ func main() {
 	admin.HandleFunc("/users", userHandler.ListUsers).Methods("GET")
 	admin.HandleFunc("/users/{id}", userHandler.UpdateUser).Methods("PUT")
 	admin.HandleFunc("/users/{id}", userHandler.DeleteUser).Methods("DELETE")
+	admin.HandleFunc("/upload", photoHandler.Upload).Methods("POST")
 
-	// Технические маршруты
+	// --- Технические ---
 	router.Handle("/metrics", promhttp.Handler())
 	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
