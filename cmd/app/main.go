@@ -84,7 +84,7 @@ func main() {
 	public.HandleFunc("/products/{id}", productHandler.GetProduct).Methods("GET")
 	public.HandleFunc("/categories", categoryHandler.ListCategories).Methods("GET")
 	public.HandleFunc("/categories/{id}", categoryHandler.GetCategory).Methods("GET")
-	public.HandleFunc("/download/{objectName}", photoHandler.Download).Methods("GET")
+	public.HandleFunc("/photos/{objectName}", photoHandler.Download).Methods("GET")
 
 	// --- Защищённые маршруты ---
 	protected := api.PathPrefix("").Subrouter()
@@ -104,7 +104,7 @@ func main() {
 	admin.HandleFunc("/users", userHandler.ListUsers).Methods("GET")
 	admin.HandleFunc("/users/{id}", userHandler.UpdateUser).Methods("PUT")
 	admin.HandleFunc("/users/{id}", userHandler.DeleteUser).Methods("DELETE")
-	admin.HandleFunc("/upload", photoHandler.Upload).Methods("POST")
+	admin.HandleFunc("/photos", photoHandler.Upload).Methods("POST")
 
 	// --- Технические ---
 	router.Handle("/metrics", promhttp.Handler())
