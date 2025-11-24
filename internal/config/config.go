@@ -46,12 +46,13 @@ func NewConfig(log *logger.Logger) (*Config, error) {
 
 	// --- Redis ---
 	redisAddr := os.Getenv("REDIS_URL")
-	if redisAddr == "" {
-		log.Fatal("REDIS_URL is not set")
+	redisPass := os.Getenv("REDIS_PASS")
+	if redisAddr == "" || redisPass == "" {
+		log.Fatal("REDIS_URL or REDIS_PASS is not set")
 	}
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     redisAddr,
-		Password: "",
+		Password: redisPass,
 		DB:       0,
 	})
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
